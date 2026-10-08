@@ -4,3 +4,26 @@ soccerwindow2.spec
 soccerwindow2
 sswindow2
 
+# Build directory and CMake artifacts
+build/
+CMakeFiles/
+CMakeCache.txt
+Makefile
+*.cmake
+
+# Autotools artifacts
+*.o
+*.a
+*.la
+*.so
+.deps/
+.libs/
+Makefile.in
+config.log
+config.status
+config.h
+stamp-h1
+autom4te.cache/
+
+# Qt generated MOC files
+moc_*.cpp

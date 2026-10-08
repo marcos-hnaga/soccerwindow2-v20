@@ -161,27 +161,14 @@ FormationEditorPainter::drawTriangulation( QPainter & painter )
         painter.setPen( M_triangle_pen );
         painter.setBrush( Qt::NoBrush );
 
-        // EdgeCont = std::unordered_map< int, DelaunayTriangulationCore::EdgePtr > 
-        for ( const DelaunayTriangulationCore::EdgeCont::value_type & e : ptr->triangulation().edges() )
+        for ( const auto & kv : ptr->triangulation().edges() )
         {
-            if ( ! e.second )
+            const auto * e = kv.second;
+            if ( e && e->vertex(0) && e->vertex(1) )
             {
-                std::cerr << "(FormationEditorPainter::drawTriangulation) invalid edge: " << e.first
-                          << " no edge pointer" << std::endl;
-                continue;
+                painter.drawLine( QLineF( e->vertex(0)->pos().x, e->vertex(0)->pos().y,
+                                          e->vertex(1)->pos().x, e->vertex(1)->pos().y ) );
             }
-            const DelaunayTriangulationCore::Vertex * v0 = e.second->vertex( 0 );
-            const DelaunayTriangulationCore::Vertex * v1 = e.second->vertex( 1 );
-            if ( ! v0 || ! v1 )
-            {
-                std::cerr << "(FormationEditorPainter::drawTriangulation) invalid edge: " << e.first
-                          << " null vertex: v0=" << ( v0 ? 1 : 0 ) << " v1=" << ( v1 ? 1 : 0 )
-                          << std::endl;
-                continue;
-            }
-
-            painter.drawLine( QLineF( v0->pos().x, v0->pos().y,
-                                      v1->pos().x, v1->pos().y ) );
         }
     }
     else
@@ -252,69 +239,58 @@ FormationEditorPainter::drawContainedTriangle( QPainter & painter )
         return;
     }
 
-    // std::shared_ptr< const Formation > f = ptr->formation();
-    // if ( ! f )
-    // {
-    //     return;
-    // }
-
     if ( ptr->triangulation().triangles().empty() )
     {
         return;
     }
 
-    const DelaunayTriangulationCore::Triangle * tri = ptr->triangulation().findTriangleContains( ptr->currentState().ball_ );
+    const auto * tri = ptr->triangulation().findTriangleContains( ptr->currentState().ball_ );
     if ( ! tri )
     {
         return;
     }
 
-    if ( tri->vertex( 0 ) == nullptr
-         || tri->vertex( 1 ) == nullptr
-         || tri->vertex( 2 ) == nullptr )
+    if ( tri && tri->vertex(0) && tri->vertex(1) && tri->vertex(2) )
     {
-        return;
-    }
+        const Vector2D vertex_0 = tri->vertex(0)->pos();
+        const Vector2D vertex_1 = tri->vertex(1)->pos();
+        const Vector2D vertex_2 = tri->vertex(2)->pos();
 
-    const Vector2D vertex_0 = tri->vertex( 0 )->pos();
-    const Vector2D vertex_1 = tri->vertex( 1 )->pos();
-    const Vector2D vertex_2 = tri->vertex( 2 )->pos();
+        const QPointF vertices[3] = {
+            QPointF( vertex_0.x, vertex_0.y ),
+            QPointF( vertex_1.x, vertex_1.y ),
+            QPointF( vertex_2.x, vertex_2.y )
+        };
 
-    const QPointF vertices[3] = {
-        QPointF( vertex_0.x, vertex_0.y ),
-        QPointF( vertex_1.x, vertex_1.y ),
-        QPointF( vertex_2.x, vertex_2.y )
-    };
+        painter.setPen( Qt::NoPen );
+        painter.setBrush( M_contained_area_brush );
+        painter.drawConvexPolygon( vertices, 3 );
 
-    painter.setPen( Qt::NoPen );
-    painter.setBrush( M_contained_area_brush );
-    painter.drawConvexPolygon( vertices, 3 );
+        // draw center point
+        Vector2D center = Triangle2D::centroid( vertex_0, vertex_1, vertex_2 );
+        const double pix = M_transform.inverted().map( QLineF( 0.0, 0.0, 1.0, 0.0 ) ).length();
 
-    // draw center point
-    Vector2D center = Triangle2D::centroid( vertex_0, vertex_1, vertex_2 );
-    const double pix = M_transform.inverted().map( QLineF( 0.0, 0.0, 1.0, 0.0 ) ).length();
+        painter.setPen( QPen( Qt::red, 0, Qt::SolidLine ) );
+        painter.setBrush( QBrush( Qt::red, Qt::SolidPattern ) );
+        painter.drawRect( QRectF( center.x - pix, center.y - pix,
+                                  pix * 2.0, pix * 2.0 ) );
 
-    painter.setPen( QPen( Qt::red, 0, Qt::SolidLine ) );
-    painter.setBrush( QBrush( Qt::red, Qt::SolidPattern ) );
-    painter.drawRect( QRectF( center.x - pix, center.y - pix,
-                              pix*2.0, pix*2.0 ) );
+        // draw the triangle's circumcircle
+        if ( Options::instance().feditShowCircumcircle() )
+        {
+            const Vector2D circumcenter = Triangle2D::circumcenter( vertex_0, vertex_1, vertex_2 );
+            double x = circumcenter.x;
+            double y = circumcenter.y;
+            double r = circumcenter.dist( vertex_0 );
 
-    // draw the triangule's circumcircle
-    if ( Options::instance().feditShowCircumcircle() )
-    {
-        const Vector2D circumcenter = Triangle2D::circumcenter( vertex_0, vertex_1, vertex_2 );
-        double x = circumcenter.x;
-        double y = circumcenter.y;
-        double r = circumcenter.dist( vertex_0 );
+            painter.setPen( QPen( Qt::cyan, 0, Qt::SolidLine ) );
+            painter.setBrush( QBrush( Qt::cyan, Qt::SolidPattern ) );
+            painter.drawRect( QRectF( x - pix, y - pix, pix * 2.0, pix * 2.0 ) );
 
-        painter.setPen( QPen( Qt::cyan, 0, Qt::SolidLine ) );
-        painter.setBrush( QBrush( Qt::cyan, Qt::SolidPattern ) );
-        painter.drawRect( QRectF( x - pix, y - pix, pix * 2.0, pix * 2.0 ) );
-        //painter.drawPoint( QPointF( x, y ) );
-
-        painter.setBrush( Qt::NoBrush );
-        painter.drawEllipse( x - r, y - r,
-                             r * 2.0, r * 2.0 );
+            painter.setBrush( Qt::NoBrush );
+            painter.drawEllipse( x - r, y - r,
+                                 r * 2.0, r * 2.0 );
+        }
     }
 }
 
@@ -461,30 +437,19 @@ FormationEditorPainter::drawBackgroundTriangulation( QPainter & painter )
 
     if ( Options::instance().feditShowTriangulation() )
     {
+        // triangulation
+
         painter.setPen( M_background_triangle_pen );
         painter.setBrush( Qt::NoBrush );
 
-        // EdgeCont = std::unordered_map< int, DelaunayTriangulationCore::EdgePtr > 
-        for ( const DelaunayTriangulationCore::EdgeCont::value_type & e : ptr->backgroundTriangulation().edges() )
+        for ( const auto & kv : ptr->backgroundTriangulation().edges() )
         {
-            if ( ! e.second )
+            const auto * e = kv.second;
+            if ( e && e->vertex(0) && e->vertex(1) )
             {
-                std::cerr << "(FormationEditorPainter::drawBackgroundTriangulation) invalid edge: " << e.first
-                          << " no edge pointer" << std::endl;
-                continue;
+                painter.drawLine( QLineF( e->vertex(0)->pos().x, e->vertex(0)->pos().y,
+                                          e->vertex(1)->pos().x, e->vertex(1)->pos().y ) );
             }
-            const DelaunayTriangulationCore::Vertex * v0 = e.second->vertex( 0 );
-            const DelaunayTriangulationCore::Vertex * v1 = e.second->vertex( 1 );
-            if ( ! v0 || ! v1 )
-            {
-                std::cerr << "(FormationEditorPainter::drawBackgroundTriangulation) invalid edge: " << e.first
-                          << " null vertex: v0=" << ( v0 ? 1 : 0 ) << " v1=" << ( v1 ? 1 : 0 )
-                          << std::endl;
-                continue;
-            }
-
-            painter.drawLine( QLineF( v0->pos().x, v0->pos().y,
-                                      v1->pos().x, v1->pos().y ) );
         }
     }
     else
@@ -497,19 +462,18 @@ FormationEditorPainter::drawBackgroundTriangulation( QPainter & painter )
         painter.setPen( M_triangle_pen );
         painter.setBrush( Qt::NoBrush );
 
-        for ( const DelaunayTriangulationCore::Vertex & v : ptr->backgroundTriangulation().vertices() )
+        for ( const auto & v : ptr->backgroundTriangulation().vertices() )
         {
-            painter.drawRect( QRectF( v.pos().x - r, v.pos().y - r, d, d ) );
+            const Vector2D & p = v.pos();
+            painter.drawRect( QRectF( p.x - r, p.y - r, d, d ) );
         }
     }
 
     //
     // draw index of vertices
-
     //
     if ( Options::instance().feditShowIndex() )
     {
-        //painter.setPen( Qt::darkRed );
         painter.setPen( Qt::darkMagenta );
         painter.setFont( M_fedit_font );
 
@@ -517,9 +481,10 @@ FormationEditorPainter::drawBackgroundTriangulation( QPainter & painter )
         painter.setWorldMatrixEnabled( false );
 
         int count = 0;
-        for ( const DelaunayTriangulationCore::Vertex & v : ptr->backgroundTriangulation().vertices() )
+        for ( const auto & v : ptr->backgroundTriangulation().vertices() )
         {
-            painter.drawText( transform.map( QPointF( v.pos().x + 0.7, v.pos().y - 0.7 ) ),
+            const Vector2D & p = v.pos();
+            painter.drawText( transform.map( QPointF( p.x + 0.7, p.y - 0.7 ) ),
                               QString::number( count ) );
             ++count;
         }
@@ -548,29 +513,28 @@ FormationEditorPainter::drawBackgroundContainedTriangle( QPainter & painter )
         return;
     }
 
-    const DelaunayTriangulationCore::Triangle * tri = ptr->backgroundTriangulation().findTriangleContains( ptr->currentState().ball_ );
-
+    const auto * tri = ptr->backgroundTriangulation().findTriangleContains( ptr->currentState().ball_ );
     if ( ! tri )
     {
         return;
     }
 
-    if ( tri->vertex( 0 ) == nullptr
-         || tri->vertex( 1 ) == nullptr
-         || tri->vertex( 2 ) == nullptr )
+    if ( tri && tri->vertex(0) && tri->vertex(1) && tri->vertex(2) )
     {
-        return;
+        const Vector2D vertex_0 = tri->vertex(0)->pos();
+        const Vector2D vertex_1 = tri->vertex(1)->pos();
+        const Vector2D vertex_2 = tri->vertex(2)->pos();
+
+        const QPointF vertices[3] = {
+            QPointF( vertex_0.x, vertex_0.y ),
+            QPointF( vertex_1.x, vertex_1.y ),
+            QPointF( vertex_2.x, vertex_2.y )
+        };
+
+        painter.setPen( Qt::NoPen );
+        painter.setBrush( M_background_contained_area_brush );
+        painter.drawConvexPolygon( vertices, 3 );
     }
-
-    const QPointF vertices[3] = {
-        QPointF( tri->vertex( 0 )->pos().x, tri->vertex( 0 )->pos().y ),
-        QPointF( tri->vertex( 1 )->pos().x, tri->vertex( 1 )->pos().y ),
-        QPointF( tri->vertex( 2 )->pos().x, tri->vertex( 2 )->pos().y )
-    };
-
-    painter.setPen( Qt::NoPen );
-    painter.setBrush( M_background_contained_area_brush );
-    painter.drawConvexPolygon( vertices, 3 );
 }
 
 /*-------------------------------------------------------------------*/

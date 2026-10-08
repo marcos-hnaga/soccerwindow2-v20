@@ -234,23 +234,25 @@ VoronoiDiagramPainter::drawDelaunayTriangulation( QPainter & painter,
 {
     const Options & opt = Options::instance();
 
-    //rcsc::Timer timer;
     rcsc::DelaunayTriangulation triangulation;
     triangulation.addVertices( players );
     triangulation.compute();
-    //std::cerr << "delaunay elapsed " << timer.elapsedReal() << " [ms]." << std::endl;
 
     QPainterPath path;
 
     painter.setPen( DrawConfig::instance().linePen() );
     painter.setBrush( DrawConfig::instance().transparentBrush() );
 
-    for ( const rcsc::DelaunayTriangulationCore::EdgeCont::value_type & e : triangulation.edges() )
+    for ( const auto & kv : triangulation.edges() )
     {
-        path.moveTo( opt.absScreenX( e.second->vertex( 0 )->pos().x ),
-                     opt.absScreenY( e.second->vertex( 0 )->pos().y ) );
-        path.lineTo( opt.absScreenX( e.second->vertex( 1 )->pos().x ),
-                     opt.absScreenY( e.second->vertex( 1 )->pos().y ) );
+        const auto * e = kv.second;
+        if ( e && e->vertex( 0 ) && e->vertex( 1 ) )
+        {
+            path.moveTo( opt.absScreenX( e->vertex( 0 )->pos().x ),
+                         opt.absScreenY( e->vertex( 0 )->pos().y ) );
+            path.lineTo( opt.absScreenX( e->vertex( 1 )->pos().x ),
+                         opt.absScreenY( e->vertex( 1 )->pos().y ) );
+        }
     }
 
     painter.drawPath( path );
@@ -284,9 +286,6 @@ VoronoiDiagramPainter::drawOld( QPainter & painter )
     {
         return;
     }
-
-    //rcsc::Timer timer;
-    //timer.restart();
 
     std::vector< rcsc::Vector2D > players_pos;
     players_pos.reserve( 22 );
@@ -457,7 +456,6 @@ VoronoiDiagramPainter::drawOld( QPainter & painter )
         }
     }
 
-    //std::cerr << "voronoi elapsed " << timer.elapsedReal() << std::endl;
     if ( opt.showVoronoiDiagram() )
     {
         QPainterPath path;

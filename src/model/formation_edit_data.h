@@ -39,6 +39,10 @@
 #include <rcsc/geom/delaunay_triangulation.h>
 #include <rcsc/geom/vector_2d.h>
 
+namespace rcsc {
+    using Triangulation = DelaunayTriangulation;
+}
+
 class FormationEditData {
 public:
 
